@@ -5,7 +5,7 @@ This repository contains all the scripts for the UI, and the basic scripts that 
 Contains the complete UI that can be used for the analysis. The UI has a separate README, which is in this folder.
 
 **Images:**  
-The example images used for the Acetabulum_curvature_semi_automatic.py interface.
+The example images (not patient data, found on radsource.us) used for the Acetabulum_curvature_semi_automatic.py interface.
 
 **finger_segmentation_separate.py:**  
 Can semi-automatically segment a separate finger on a DICOM x-ray image using a lasso approach. Saves segmentation masks of the different finger bones.
