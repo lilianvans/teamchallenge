@@ -1,97 +1,98 @@
-import SimpleITK as sitk
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-from skimage import filters, exposure, morphology, feature
-from scipy import ndimage as ndi
 from pathlib import Path
 import pydicom
-import cv2
+
+import pandas as pd  
+# root map
+root = Path(r"bekken AP")
+
+# index and rows for Excel
+index = {}
+rows = []
 
 def convert_to_months(age_str):
-    time_span = age_str[-1]
-    age_str = age_str[:-1]
-    if time_span == "Y":
-        age_int = int(age_str)
-        age_fl = float(age_int*12)
-    elif time_span == "M":
-        age_fl = float(age_str)
-    elif time_span == "W":
-        age_int = int(age_str)
-        age_fl = float(age_int/52*12)
-    elif time_span == "D":
-        age_int = int(age_str)
-        age_fl = float(age_int/365*12)
-    else:
-        print("Could not find time span")
-    return age_fl
+    if age_str is None:
+        return None
 
-root = Path(r"Hand Hurler")
-# Build an index of all DICOM images, sorted by patient, study date and image series description.
-index = {}
-patient_age_distribution = []
+    try:
+        time_span = age_str[-1]
+        age_value = age_str[:-1]
+
+        if not age_value.isdigit():
+            return None
+
+        age_int = int(age_value)
+
+        if time_span == "Y":
+            return float(age_int * 12)
+        elif time_span == "M":
+            return float(age_int)
+        elif time_span == "W":
+            return float(age_int / 52 * 12)
+        elif time_span == "D":
+            return float(age_int / 365 * 12)
+        else:
+            return None
+    except Exception:
+        return None
+
+
+
+
+# loop over files in root map
 for file in root.rglob("*"):
     if not file.is_file():
-        # Skip everything that is not a file.
         continue
 
-    # Try to read the DICOM file and skip it if it failed.
     try:
         ds = pydicom.dcmread(file, stop_before_pixels=True)
     except Exception:
         continue
 
-    # Read the patient ID, study date and image series description.
+    folder_name = file.parent.parent.name
+
+    # get metadata
     patient_id = ds.get("PatientID")
     study_date = ds.get("StudyDate")
     patient_age = ds.get("PatientAge")
-    series_description = ds.get("SeriesDescription")
+    body_part = ds.get("BodyPartExamined")
+    laterality= ds.get("ImageLaterality")
     
-    # Create new index levels.
-    if patient_age is not None:
-        if patient_id not in index:
-            index[patient_id] = {}
-        if study_date not in index[patient_id]:
-            index[patient_id][study_date] = {}
-        if series_description not in index[patient_id][study_date]: 
-            index[patient_id][study_date][series_description] = []
 
-        # Convert age to a float of months
-        patient_age = convert_to_months(patient_age)
-        patient_age_distribution.append(patient_age)
-        # Add the file to the index.
-        index[patient_id][study_date][series_description].append(patient_age)
-        index[patient_id][study_date][series_description].append(file)
+    # check data exists
+    if patient_id and study_date and patient_age and body_part and folder_name:
+
+        # convert age to months
+        patient_age_months = convert_to_months(patient_age)
+
+        # add to list
+        rows.append({
+            "Patient_ID": patient_id,
+            "StudyDate": study_date,
+            "Folder": folder_name,
+            "Patient_Age_Months": patient_age_months,
+            "BodyPart": body_part,
+            "Laterality": laterality,
+            
+        })
+
+    
 
 
-    # Display an overview of all indexed DICOM images.
+# print overview
 for patient_id, studies in index.items():
     print(f'Patient {patient_id}:')
     for study_date, series in studies.items():
-        print(f'    {study_date}: {[description for description in series.keys()]}')
-# Read one of the images.
-reader = sitk.ImageSeriesReader()
-print(index['H44']['20150901']['Hand PA'][0])
-age, file_read = index['H44']['20150901']['Hand PA']
-# print(Path(file_read))
-img = sitk.ReadImage(file_read)
-# img = reader.Execute()
-
-print('age', age)
-# Show the image.
-img_array = sitk.GetArrayFromImage(img)
-
-print(min(patient_age_distribution), max(patient_age_distribution))
+        print(f'    {study_date}: {[desc for desc in series.keys()]}')
 
 
-# Convert to numpy array
-arr = np.array(patient_age_distribution)
+# make dataframe
+df = pd.DataFrame(rows)
 
-# Create histogram
-plt.hist(arr, bins=200, range=(0.5, 300), edgecolor='black')
-plt.xlabel("Value")
-plt.ylabel("Frequency")
-plt.title("Histogram")
-plt.show()
+# sort dataframe
+df = df.sort_values(by=["Patient_ID", "StudyDate"])
 
+# save to excel
+output_path = "hip_overzicht.xlsx"
+df.to_excel(output_path, index=False)
+print(f"Excel saved as: {output_path}")
 
