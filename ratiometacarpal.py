@@ -183,7 +183,7 @@ def process_folder(root_folder, output_excel):
     # opslaan naar excel
     df.to_excel(output_excel, index=False)
 
-    print(f"\n✅ Excel opgeslagen: {output_excel}")
+    print(f"\n Excel opgeslagen: {output_excel}")
 
 
 
